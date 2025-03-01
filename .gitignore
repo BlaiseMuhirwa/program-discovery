@@ -1,0 +1,32 @@
+# Generated files and folders
+.DS_Store 
+.vscode/
+build
+
+# Executables
+*.exe 
+*.out
+*.app 
+
+# Virtual environments 
+.env 
+
+# Experimental assets 
+metrics
+node-access-distributions
+
+# PYcache
+**/__pycache__
+
+
+# Documentation related files
+docs/_build/
+docs/doxygen_output
+
+# other files
+data/
+baselines/
+external/openmp
+
+# Python wheels 
+wheelhouse

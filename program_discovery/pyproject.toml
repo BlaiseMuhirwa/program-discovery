@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "program search experiments"
+version = "0.1.0"
+description = "Program search for a pruning/beam search algorithm"
+authors = ["BlaiseMuhirwa <blaisemuhirwa3@gmail.com>"]
+license = "Apache 2.0"
+
+[tool.poetry.dependencies]
+python = ">=3.9,<3.13"
+black = "^23.11.0"
+numpy = "^1.26.1, <2.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
