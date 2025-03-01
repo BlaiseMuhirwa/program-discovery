@@ -2,7 +2,7 @@
 #include <flatnav/distances/DistanceInterface.h>
 #include <flatnav/distances/InnerProductDistance.h>
 #include <flatnav/distances/SquaredL2Distance.h>
-#include <flatnav/index/Index.h>
+#include <flatnav/index/FlexibleIndex.h>
 #include <flatnav/util/Datatype.h>
 #include <flatnav/util/Multithreading.h>
 #include <pybind11/numpy.h>
@@ -24,7 +24,7 @@
 #define TOSTRING(x) STRINGIFY(x)
 
 
-using flatnav::Index;
+using flatnav::FlexibleIndex;
 using flatnav::distances::DistanceInterface;
 using flatnav::distances::InnerProductDistance;
 using flatnav::distances::SquaredL2Distance;
@@ -56,7 +56,9 @@ class PyIndex : public std::enable_shared_from_this<PyIndex<dist_t, label_t>> {
   int _dim;
   label_t _label_id;
   bool _verbose;
-  Index<dist_t, label_t>* _index;
+  FlexibleIndex<dist_t, label_t>* _index;
+
+  py::object _pruning_callback;
 
   typedef std::pair<py::array_t<float>, py::array_t<label_t>> DistancesLabelsPair;
 
@@ -227,6 +229,60 @@ class PyIndex : public std::enable_shared_from_this<PyIndex<dist_t, label_t>> {
     return {dists, labels};
   }
 
+
+  void executeCustomPruning(FlexibleIndex<dist_t, label_t>::PriorityQueue& neighbors, int M) {
+    if (_pruning_callback.is_none()) {
+      return;
+    }
+
+    // Convert C++ PriorityQueue to python list
+    py::list candidates;
+    std::vector<std::pair<float, label_t>> temp_storage;
+
+    // store items temporarily since we're emptying the queue
+    while (!neighbors.empty()) {
+      auto [distance, node_id] = neighbors.top();
+      temp_storage.push_back({distance, node_id});
+      candidates.append(py::make_tuple(distance, node_id));
+      neighbors.pop();
+    }
+
+    // Invoke the python pruning callback
+    py::object result;
+    try {
+      result = _pruning_callback(candidates, M);
+
+    } catch(const py::error_already_set& e) {
+      // If an exception is thrown in the callback, we need to catch it and 
+      // print it to stderr
+      // First, let's restore the items back to the queue
+      for (const auto& [distance, id]: temp_storage) {
+        neighbors.emplace(distance, id);
+      }
+      PyErr_Print();
+      throw;
+    }
+
+    // Convert the result back to a PriorityQueue
+    try {
+      py::list pruned_candidates = result.cast<py::list>(result);
+      for (auto item : pruned_candidates) {
+        float dist = py::cast<float>(item[0]);
+        label_t id = py::cast<label_t>(item[1]);
+        neighbors.emplace(dist, id);
+      }
+    } catch (const py::cast_error& e) {
+      // If for some reason conversion fails, restore the original queue 
+      // and throw an exception
+      for (const auto& [distance, id]: temp_storage) {
+        neighbors.emplace(distance, id);
+      }
+      throw std::invalid_argument("Pruning callback must return a list of tuples with (distance, id).");
+    }
+
+  }
+
+
  public:
   explicit PyIndex(std::unique_ptr<Index<dist_t, label_t>> index)
       : _dim(index->dataDimension()), _label_id(0), _verbose(false), _index(index.release()) {
@@ -263,6 +319,24 @@ class PyIndex : public std::enable_shared_from_this<PyIndex<dist_t, label_t>> {
     }
   }
 
+  void setPruningCallback(py::object callback) {
+    // TODO: Check whether we need to use std::move here
+    _pruning_callback = callback;
+
+    _index->setPruningFunction(
+      [this](FlexibleIndex<dist_t, label_t>::PriorityQueue& neighbors, int M) {
+        // Only use custom pruning if we have a callback
+        if (!this->_pruning_callback.is_none()) {
+          this->executeCustomPruning(neighbors, M);
+        } else {
+          // Use default pruning
+          this->_index->defaultSelectNeighbors(neighbors, M);
+        }
+      }
+    );
+
+  }
+
   Index<dist_t, label_t>* getIndex() { return _index; }
 
   ~PyIndex() { delete _index; }
@@ -277,6 +351,12 @@ class PyIndex : public std::enable_shared_from_this<PyIndex<dist_t, label_t>> {
     _index->buildGraphLinks(/* mtx_filename = */ mtx_filename);
   }
 
+  float getDistanceBetweenNodes(uint32_t node1, uint32_t node2) {
+    auto* dist_interface = _index->distance();
+    auto* node1_data = _index->getNodeData(node1);
+    auto* node2_data = _index->getNodeData(node2);
+    return dist_interface->distance(node1_data, node2_data);
+  }
 
   std::vector<std::vector<uint32_t>> getGraphOutdegreeTable() { return _index->getGraphOutdegreeTable(); }
 
@@ -301,7 +381,7 @@ class PyIndex : public std::enable_shared_from_this<PyIndex<dist_t, label_t>> {
   void save(const std::string& filename) { _index->saveIndex(/* filename = */ filename); }
 
   static std::shared_ptr<PyIndex<dist_t, label_t>> loadIndex(const std::string& filename) {
-    auto index = Index<dist_t, label_t>::loadIndex(/* filename = */ filename);
+    auto index = FlexibleIndex<dist_t, label_t>::loadIndex(/* filename = */ filename);
     return std::make_shared<PyIndex<dist_t, label_t>>(std::move(index));
   }
 
@@ -470,7 +550,10 @@ void bindSpecialization(py::module_& index_submodule) {
       .def("set_num_threads", &IndexType::setNumThreads, py::arg("num_threads"), SET_NUM_THREADS_DOCSTRING)
       .def_static("load_index", &IndexType::loadIndex, py::arg("filename"), LOAD_INDEX_DOCSTRING)
       .def_property_readonly("max_edges_per_node", &IndexType::getMaxEdgesPerNode)
-      .def_property_readonly("num_threads", &IndexType::getNumThreads, NUM_THREADS_DOCSTRING);
+      .def_property_readonly("num_threads", &IndexType::getNumThreads, NUM_THREADS_DOCSTRING)
+      .def("get_distance_between_nodes", &IndexType::getDistanceBetweenNodes, py::arg("node1"), py::arg("node2"),
+           "Get the distance between two nodes.")
+      .def("set_pruning_callback", &IndexType::setPruningCallback, py::arg("callback"), "Set a custom pruning callback.");
 }
 
 void defineIndexSubmodule(py::module_& index_submodule) {

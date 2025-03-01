@@ -910,6 +910,12 @@ class PruningAlgorithm:
 
 class Node:
     """Datatype for (node ID, distance) that supports distance computations."""
+    def __init__(self, node_id: int, distance: float):
+        self.node_id = node_id
+        self.distance = distance
+    
+    def __eq__(self, other):
+        return self.node_id == other.node_id
 
 
 # None of these are implemented, this is just to demonstrate.
@@ -1035,6 +1041,13 @@ def build_beam_search():
     algorithm.update_return_var(saved_candidates)
     algorithm.sub_statements = statements
     return algorithm
+
+
+def build_select_neighbors_heuristic():
+    """
+    Build the base HNSW select neighbors heuristic.
+    """
+    pass
 
 
 algo = build_beam_search()
