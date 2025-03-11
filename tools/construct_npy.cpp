@@ -3,6 +3,7 @@
 #include <flatnav/distances/InnerProductDistance.h>
 #include <flatnav/distances/SquaredL2Distance.h>
 #include <flatnav/index/Index.h>
+#include <flatnav/index/FlexibleIndex.h>
 #include <flatnav/util/Datatype.h>
 #include <algorithm>
 #include <chrono>
@@ -20,7 +21,7 @@
 #include <vector>
 #include "cnpy.h"
 
-using flatnav::Index;
+using flatnav::FlexibleIndex;
 using flatnav::distances::DistanceInterface;
 using flatnav::distances::InnerProductDistance;
 using flatnav::distances::SquaredL2Distance;
@@ -31,7 +32,7 @@ template <typename dist_t>
 void buildIndex(float* data, std::unique_ptr<DistanceInterface<dist_t>> distance, int N, int M, int dim,
                 int ef_construction, int build_num_threads, const std::string& save_file) {
 
-  auto index = new Index<dist_t, int>(
+  auto index = new FlexibleIndex<dist_t, int>(
       /* dist = */ std::move(distance), /* dataset_size = */ N,
       /* max_edges = */ M);
 

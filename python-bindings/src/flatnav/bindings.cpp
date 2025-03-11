@@ -230,28 +230,24 @@ class PyIndex : public std::enable_shared_from_this<PyIndex<dist_t, label_t>> {
   }
 
 
-  void executeCustomPruning(FlexibleIndex<dist_t, label_t>::PriorityQueue& neighbors, int M) {
-    if (_pruning_callback.is_none()) {
-      return;
-    }
-
+  void executeCustomPruning(typename FlexibleIndex<dist_t, label_t>::PriorityQueue& neighbors, int M) {
     // Convert C++ PriorityQueue to python list
     py::list candidates;
     std::vector<std::pair<float, label_t>> temp_storage;
 
     // store items temporarily since we're emptying the queue
     while (!neighbors.empty()) {
-      auto [distance, node_id] = neighbors.top();
-      temp_storage.push_back({distance, node_id});
-      candidates.append(py::make_tuple(distance, node_id));
+      auto pair = neighbors.top();
+      temp_storage.push_back({pair.first, pair.second});
+      candidates.append(py::make_tuple(pair.first, pair.second));
       neighbors.pop();
     }
 
     // Invoke the python pruning callback
     py::object result;
     try {
-      result = _pruning_callback(candidates, M);
-
+      result = this->_pruning_callback(candidates, M); 
+      std::cout << "Pruning callback executed successfully" << "\n" << std::flush;
     } catch(const py::error_already_set& e) {
       // If an exception is thrown in the callback, we need to catch it and 
       // print it to stderr
@@ -265,10 +261,11 @@ class PyIndex : public std::enable_shared_from_this<PyIndex<dist_t, label_t>> {
 
     // Convert the result back to a PriorityQueue
     try {
-      py::list pruned_candidates = result.cast<py::list>(result);
+      py::list pruned_candidates = result.cast<py::list>();
       for (auto item : pruned_candidates) {
-        float dist = py::cast<float>(item[0]);
-        label_t id = py::cast<label_t>(item[1]);
+        py::tuple tuple_item = py::cast<py::tuple>(item);
+        float dist = py::cast<float>(tuple_item[0]);
+        label_t id = py::cast<label_t>(tuple_item[1]);
         neighbors.emplace(dist, id);
       }
     } catch (const py::cast_error& e) {
@@ -284,7 +281,7 @@ class PyIndex : public std::enable_shared_from_this<PyIndex<dist_t, label_t>> {
 
 
  public:
-  explicit PyIndex(std::unique_ptr<Index<dist_t, label_t>> index)
+  explicit PyIndex(std::unique_ptr<FlexibleIndex<dist_t, label_t>> index)
       : _dim(index->dataDimension()), _label_id(0), _verbose(false), _index(index.release()) {
 
     if (_verbose) {
@@ -297,7 +294,7 @@ class PyIndex : public std::enable_shared_from_this<PyIndex<dist_t, label_t>> {
       : _dim(distance->dimension()),
         _label_id(0),
         _verbose(verbose),
-        _index(new Index<dist_t, label_t>(
+        _index(new FlexibleIndex<dist_t, label_t>(
             /* dist = */ std::move(distance),
             /* dataset_size = */ dataset_size,
             /* max_edges_per_node = */ max_edges_per_node,
@@ -321,23 +318,17 @@ class PyIndex : public std::enable_shared_from_this<PyIndex<dist_t, label_t>> {
 
   void setPruningCallback(py::object callback) {
     // TODO: Check whether we need to use std::move here
-    _pruning_callback = callback;
+    this->_pruning_callback = std::move(callback);
+    if (_pruning_callback.is_none()) {
+      throw std::invalid_argument("Pruning callback must be a callable object.");
+    }
 
-    _index->setPruningFunction(
-      [this](FlexibleIndex<dist_t, label_t>::PriorityQueue& neighbors, int M) {
-        // Only use custom pruning if we have a callback
-        if (!this->_pruning_callback.is_none()) {
-          this->executeCustomPruning(neighbors, M);
-        } else {
-          // Use default pruning
-          this->_index->defaultSelectNeighbors(neighbors, M);
-        }
+    this->_index->setPruningFunction(
+      [this](typename FlexibleIndex<dist_t, label_t>::PriorityQueue& neighbors, int M) {
+        this->executeCustomPruning(neighbors, M);
       }
     );
-
   }
-
-  Index<dist_t, label_t>* getIndex() { return _index; }
 
   ~PyIndex() { delete _index; }
 
@@ -382,7 +373,10 @@ class PyIndex : public std::enable_shared_from_this<PyIndex<dist_t, label_t>> {
 
   static std::shared_ptr<PyIndex<dist_t, label_t>> loadIndex(const std::string& filename) {
     auto index = FlexibleIndex<dist_t, label_t>::loadIndex(/* filename = */ filename);
-    return std::make_shared<PyIndex<dist_t, label_t>>(std::move(index));
+    auto flexible_index = std::unique_ptr<FlexibleIndex<dist_t, label_t>>(
+      static_cast<FlexibleIndex<dist_t, label_t>*>(index.release())
+    );
+    return std::make_shared<PyIndex<dist_t, label_t>>(std::move(flexible_index));
   }
 
   std::shared_ptr<PyIndex<dist_t, label_t>> allocateNodes(

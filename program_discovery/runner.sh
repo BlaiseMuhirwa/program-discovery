@@ -10,7 +10,6 @@ function build_flatnav() {
     # Check if wheelhouse directory exists. Only if it doesn't, build flatnav
     if [ ! -d "wheelhouse" ]; then
         echo "Building flatnav"
-        build_flatnav_wheel
         ./cibuild.sh --current-version 3.12
     else
         echo "Flatnav wheel already exists"
@@ -68,13 +67,15 @@ function get_tag_name() {
 TAG_NAME=$(get_tag_name)
 
 build_flatnav
+mkdir -p program_discovery/wheelhouse
 cp wheelhouse/* program_discovery/wheelhouse/
+
 
 # Print commands and their arguments as they are executed
 set -x
 
 DATA_DIR=${DATA_DIR:-$(pwd)/data}
-
+cp -r ${DATA_DIR} program_discovery/
 # Directory for storing metrics and plots. 
 METRICS_DIR=${METRICS_DIR:-$(pwd)/metrics}
 CONTAINER_NAME=${CONTAINER_NAME:-prog-discovery-runner}
@@ -99,4 +100,5 @@ docker build --tag program-discovery:$TAG_NAME -f Dockerfile .
 docker run \
         --name $CONTAINER_NAME \
         -it \
+        --volume $DATA_DIR:/root/data \
         --rm program-discovery:$TAG_NAME

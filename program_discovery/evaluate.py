@@ -1,4 +1,5 @@
-from program_discovery.abstractions import (
+import argparse
+from abstractions import (
     Variable,
     Expression,
     Statement,
@@ -12,7 +13,7 @@ from program_discovery.abstractions import (
     CallableExpression,
     ALL_CALLABLES,
 )
-from program_discovery.plotting.metrics import compute_metrics
+from plotting.metrics import compute_metrics
 from copy import deepcopy
 import flatnav
 from flatnav.data_type import DataType
@@ -36,9 +37,10 @@ class PruningProgramSearchExecutor:
 
         return distance_fn
 
-    def __call__(self, candidates, M):
+    def __call__(self, candidates: list[tuple[float, int]], M: int) -> list[tuple[float, int]]:
         """
         Execute the pruning algorithm.
+        NOTE: The list of candidates is retrieved from the C++ backend.
         :param candidates: List of (distance, node_id) tuples
         :param M: Maximum number of neighbors to select
         :returns: List of (distance, node_id) tuples (pruned candidates)
@@ -53,9 +55,13 @@ class PruningProgramSearchExecutor:
             "distance_fn": self.distance_fn,
         }
 
+        for _ in range(10):
+            print("Statement executed...")
+
         # Add all the callable functions
         for fn in ALL_CALLABLES:
-            env[fn.__name__] = fn
+            if fn.__name__ not in env:
+                env[fn.__name__] = fn
 
         # Execute the pruning algorithm
         for statement in self.algorithm._statements:
@@ -122,6 +128,7 @@ def evaluate_index(index, queries, ground_truth) -> dict:
         index=index,
         queries=queries,
         ground_truth=ground_truth,
+        ef_search=100
     )
 
     score = metrics["recall"] * metrics["qps"]
@@ -153,10 +160,9 @@ def run_program_search(
         verbose=False,
         collect_stats=False
     )
-
+    index.set_num_threads(4)
     # Create a pruning algorithm
     best_algorithm = build_beam_search()
-
     index = setup_index_with_pruning_algorithm(index, best_algorithm)
 
     index.add(dataset, ef_construction=100, num_initializations=100)
@@ -199,6 +205,7 @@ def run_program_search(
             verbose=False,
             collect_stats=False
         )
+        index.set_num_threads(4)
         index = setup_index_with_pruning_algorithm(index, candidate_algorithm)
         index.add(dataset, ef_construction=100, num_initializations=100)
 
@@ -216,5 +223,96 @@ def run_program_search(
 
 
 
+def parse_arguments() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Benchmark Flatnav on Big ANN datasets."
+    )
+
+    parser.add_argument(
+        "--num-node-links",
+        nargs="+",
+        type=int,
+        default=[16, 32],
+        help="Number of node links per node.",
+    )
+
+    parser.add_argument(
+        "--ef-construction",
+        nargs="+",
+        type=int,
+        default=[100, 200, 300, 400, 500],
+        help="ef_construction parameter.",
+    )
+
+    parser.add_argument(
+        "--ef-search",
+        nargs="+",
+        type=int,
+        default=[100, 200, 300, 400, 500, 1000, 2000, 3000, 4000],
+        help="ef_search parameter.",
+    )
+
+    parser.add_argument(
+        "--num-initializations",
+        required=False,
+        nargs="+",
+        type=int,
+    )
+
+    parser.add_argument(
+        "--dataset",
+        required=True,
+        help="Path to a single ANNS benchmark dataset to run on.",
+    )
+    parser.add_argument(
+        "--queries", required=True, help="Path to a singe queries file."
+    )
+    parser.add_argument(
+        "--gtruth",
+        required=True,
+        help="Path to a single ground truth file to evaluate on.",
+    )
+    parser.add_argument(
+        "--metric",
+        required=True,
+        default="l2",
+        help="Distance tye. Options include `l2` and `angular`.",
+    )
+
+    parser.add_argument(
+        "--num-build-threads",
+        required=False,
+        default=1,
+        type=int,
+        help="Number of threads to use during index construction.",
+    )
+
+    return parser.parse_args()
 
 
+
+def main():
+    args = parse_arguments()
+
+    dataset = np.load(args.dataset)
+    queries = np.load(args.queries)
+    ground_truth = np.load(args.gtruth)
+
+    best_algorithm, best_metrics = run_program_search(
+        dataset=dataset,
+        queries=queries,
+        ground_truth=ground_truth,
+        distance_type=args.metric,
+        index_data_type=DataType.float32,
+        dim=dataset.shape[1],
+        dataset_size=dataset.shape[0],
+        max_edges_per_node=16,
+        num_iterations=1000
+    )
+
+    print(f"Best algorithm: {best_algorithm.to_str()}")
+    print(f"Best metrics: {best_metrics}")
+
+
+if __name__=="__main__":
+    main()

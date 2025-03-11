@@ -36,14 +36,10 @@ namespace flatnav {
 template <typename dist_t, typename label_t>
 class Index {
 public:
-  typedef std::priority_queue<dist_node_t, std::vector<dist_node_t>, CompareByFirst> PriorityQueue;
-protected:
-
   typedef std::pair<float, label_t> dist_label_t;
   // internal node numbering scheme. We might need to change this to uint64_t
   typedef uint32_t node_id_t;
   typedef std::pair<float, node_id_t> dist_node_t;
-
   // NOTE: by default this is a max-heap. We could make this a min-heap
   // by using std::greater, but we want to use the queue as both a max-heap and
   // min-heap depending on the context.
@@ -53,7 +49,8 @@ protected:
       return a.first < b.first;
     }
   };
-
+  typedef std::priority_queue<dist_node_t, std::vector<dist_node_t>, CompareByFirst> PriorityQueue;
+protected:
   // Large (several GB), pre-allocated block of memory.
   char* _index_memory;
 
@@ -142,7 +139,7 @@ protected:
     archive(cereal::binary_data(_index_memory, total_mem));
   }
 
- public:
+public:
   /**
    * @brief Construct a new Index object for approximate near neighbor search.
    *

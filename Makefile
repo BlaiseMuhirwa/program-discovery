@@ -1,4 +1,4 @@
-CPP_FILES := $(wildcard flatnav/**/*.h flatnav/**/*.cpp python-bindings/*.cpp tools/*.cpp developmental-features/**/*.h)
+CPP_FILES := $(wildcard include/**/*.h include/**/*.cpp python-bindings/*.cpp tools/*.cpp developmental-features/**/*.h)
 CIBUILDWHEEL_VERSION := 2.22.0
 
 

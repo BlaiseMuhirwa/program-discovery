@@ -918,13 +918,12 @@ class Node:
         return self.node_id == other.node_id
 
 
-# None of these are implemented, this is just to demonstrate.
 def greater_or_equal(x: float, y: float) -> bool:
-    return False
+    return x >= y
 
 
 def sort_by_distance_asc(x: list[Node]) -> list[Node]:
-    return x
+    return sorted(x, key=lambda n: n.distance)
 
 
 def empty_node_list() -> list[Node]:
@@ -932,41 +931,47 @@ def empty_node_list() -> list[Node]:
 
 
 def sort_by_distance_desc(x: list[Node]) -> list[Node]:
-    return x
+    return sorted(x, key=lambda n: n.distance, reverse=True)
 
 
 def argmin_distance(x: list[Node]) -> Node:
-    return x[0]
+    min_distance = float("inf")
+    min_node = x[0]
+    for node in x:
+        if node.distance < min_distance:
+            min_distance = node.distance
+            min_node = node
+    
+    return min_node
 
 
 def argmax_distance(x: list[Node]) -> Node:
-    return x[0]
-
+    max_distance = float("-inf")
+    max_node = x[0]
+    for node in x:
+        if node.distance > max_distance:
+            max_distance = node.distance
+            max_node = node
+    return max_node
 
 def min_distance(x: list[Node], y: Node) -> float:
     return 0.0
 
-
 def max_distance(x: list[Node], y: Node) -> float:
     return 0.0
-
 
 def median_distance(x: list[Node], y: Node) -> float:
     return 0.0
 
-
 def mean_distance(x: list[Node], y: Node) -> float:
     return 0.0
-
 
 def append_node(x: list[Node], y: Node) -> list[Node]:
     x.append(y)
     return x
 
-
 def take_first_M(x: list[Node]) -> list[Node]:
     return x
-
 
 def distance_to_query(x: Node) -> float:
     return 0.0
