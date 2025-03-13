@@ -10,29 +10,25 @@ from recommonmark.parser import CommonMarkParser
 
 # Add the Markdown parser.
 source_parsers = {
-    '.md': CommonMarkParser,
+    ".md": CommonMarkParser,
 }
 
 # Add '.md' to source suffixes.
 source_suffix = {
-    '.rst': 'restructuredtext',
-    '.txt': 'markdown',
-    '.md': 'markdown',
+    ".rst": "restructuredtext",
+    ".txt": "markdown",
+    ".md": "markdown",
 }
 
-project = 'FlatNav'
-copyright = '2024, Benjamin Ray Coleman, Blaise Munyampirwa, Vihan Lakshman'
-author = 'Benjamin Ray Coleman, Blaise Munyampirwa, Vihan Lakshman'
-release = '0.0.1'
+project = "FlatNav"
+copyright = "2024, Benjamin Ray Coleman, Blaise Munyampirwa, Vihan Lakshman"
+author = "Benjamin Ray Coleman, Blaise Munyampirwa, Vihan Lakshman"
+release = "0.0.1"
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = [
-    "breathe",
-    "sphinx.ext.autodoc",
-    "myst_parser"
-]
+extensions = ["breathe", "sphinx.ext.autodoc", "myst_parser"]
 
 # This is rendering the markdown files.
 # Some of these might not be necessary though. I copied them from the official documentation.
@@ -55,13 +51,11 @@ myst_enable_extensions = [
 
 
 # Configure Breathe to find the Doxygen-generated XML files for the C++ code
-breathe_projects = {
-    "FlatNav": "./doxygen_output/xml"
-}
+breathe_projects = {"FlatNav": "./doxygen_output/xml"}
 breathe_default_project = "FlatNav"
 
-templates_path = ['_templates']
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
+templates_path = ["_templates"]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 
 # Automatically add type annotations to the generated function signatures and descriptions. This
@@ -71,5 +65,5 @@ autodoc_typehints = "both"
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-html_theme = 'sphinx_rtd_theme'
-html_static_path = ['_static']
+html_theme = "sphinx_rtd_theme"
+html_static_path = ["_static"]

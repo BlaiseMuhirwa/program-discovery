@@ -1,10 +1,6 @@
-import sys 
-from ._core import (
-    MetricType,
-    data_type,
-    __version__,
-    __doc__
-)
+import sys
+from ._core import MetricType, data_type, __version__, __doc__
+
 
 class _DataTypeModule:
     from ._core.data_type import DataType
@@ -23,13 +19,7 @@ class _IndexModule:
 
 
 index = _IndexModule
-sys.modules['flatnav.index'] = _IndexModule
-sys.modules['flatnav.data_type'] = _DataTypeModule
+sys.modules["flatnav.index"] = _IndexModule
+sys.modules["flatnav.data_type"] = _DataTypeModule
 
-__all__ = [
-    'MetricType',
-    'data_type',
-    'index',
-    '__version__',
-    '__doc__'
-]
+__all__ = ["MetricType", "data_type", "index", "__version__", "__doc__"]

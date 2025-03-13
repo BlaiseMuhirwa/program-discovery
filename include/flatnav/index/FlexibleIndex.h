@@ -41,10 +41,8 @@ class FlexibleIndex : public Index<dist_t, label_t> {
 
   void selectNeighbors(PriorityQueue& neighbors, int M) {
     if (_custom_pruning_function) {
-      std::cout << "Using custom pruning function" << "\n" << std::flush;
       _custom_pruning_function(neighbors, M);
     } else {
-      std::cout << "Using default pruning function" << "\n" << std::flush;
       this->defaultSelectNeighbors(neighbors, M);
     }
   }

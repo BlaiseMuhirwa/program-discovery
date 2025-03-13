@@ -30,3 +30,6 @@ external/openmp
 
 # Python wheels 
 wheelhouse
+
+# Virtual environment files
+program-discovery

@@ -1,6 +1,6 @@
 
 
-mnist-bench-flatnav: 
+mnist: 
 	poetry run python evaluate.py \
 		--dataset ../data/mnist-784-euclidean/mnist-784-euclidean.train.npy \
 		--queries ../data/mnist-784-euclidean/mnist-784-euclidean.test.npy \

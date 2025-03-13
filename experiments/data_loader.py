@@ -4,7 +4,9 @@ import os
 from typing import Tuple, List, Optional, Union
 
 
-def read_ivecs_file(filename: str, range: Optional[tuple[int, int]] = None) -> np.ndarray:
+def read_ivecs_file(
+    filename: str, range: Optional[tuple[int, int]] = None
+) -> np.ndarray:
     with open(filename, "rb") as f:
         dimension = np.fromfile(f, dtype=np.int32, count=1)[0]
         vec_size = 4 + dimension * 4
@@ -20,12 +22,13 @@ def read_ivecs_file(filename: str, range: Optional[tuple[int, int]] = None) -> n
         assert 1 <= start <= end <= total_vectors, "Invalid range specified."
 
         f.seek((start - 1) * vec_size, 0)
-        v = np.fromfile(
-            f, dtype=np.int32, count=(dimension + 1) * (end - start + 1)
-        )
+        v = np.fromfile(f, dtype=np.int32, count=(dimension + 1) * (end - start + 1))
         return v.reshape((end - start + 1, dimension + 1))[:, 1:]
 
-def read_bvecs_file(filename: str, range: Optional[tuple[int, int]] = None) -> np.ndarray:
+
+def read_bvecs_file(
+    filename: str, range: Optional[tuple[int, int]] = None
+) -> np.ndarray:
     with open(filename, "rb") as f:
         dimension = np.fromfile(f, dtype=np.int32, count=1)[0]
         vec_size = 4 + dimension
@@ -41,9 +44,7 @@ def read_bvecs_file(filename: str, range: Optional[tuple[int, int]] = None) -> n
         assert 1 <= start <= end <= total_vectors, "Invalid range specified."
 
         f.seek((start - 1) * vec_size, 0)
-        v = np.fromfile(
-            f, dtype=np.uint8, count=(dimension + 4) * (end - start + 1)
-        )
+        v = np.fromfile(f, dtype=np.uint8, count=(dimension + 4) * (end - start + 1))
         return v.reshape((end - start + 1, dimension + 4))[:, 4:]
 
 
@@ -129,7 +130,7 @@ class BinaryDatasetLoader(DatasetLoader):
     """
     Dataset loader for binary files. This can be used to load .fbin, .u8bin and .i8bin files.
     The `dtype` constructor parameter must be set to the appropriate numpy dtype.
-    That is, dtype=np.uint8 for .u8bin files, dtype=np.int8 for .i8bin files, 
+    That is, dtype=np.uint8 for .u8bin files, dtype=np.int8 for .i8bin files,
     and dtype=np.float32 for .fbin files.
     """
 
@@ -151,7 +152,6 @@ class BinaryDatasetLoader(DatasetLoader):
             ground_truth = read_ivecs_file(self.ground_truth_path)
             num_queries, K = ground_truth.shape
             return ground_truth, None, num_queries, K
-
 
         with open(path, "rb") as f:
             num_queries = np.fromfile(f, dtype=np.uint32, count=1)[0]
@@ -190,7 +190,7 @@ class BinaryDatasetLoader(DatasetLoader):
             chunk_size = end_index - start_index
 
             # Calculate the bytes offset from the start of the file data (after header)
-            # Each point consists of num_dimensions floats, and each float 
+            # Each point consists of num_dimensions floats, and each float
             # is np.dtype(np.dtype).itemsize bytes
             offset = 8 + start_index * num_dimensions * np.dtype(self.dtype).itemsize
 
@@ -227,7 +227,7 @@ def get_data_loader(**kwargs) -> DatasetLoader:
     train_dataset_path = kwargs.get("train_dataset_path")
     if not train_dataset_path:
         raise ValueError("The train_dataset_path parameter is required.")
-    
+
     file_extension_to_loader = {
         ".npy": NpyDatasetLoader,
         ".bvecs": BvecsDatasetLoader,
@@ -239,5 +239,5 @@ def get_data_loader(**kwargs) -> DatasetLoader:
     for extension, loader in file_extension_to_loader.items():
         if train_dataset_path.endswith(extension):
             return loader(**kwargs)
-        
+
     raise ValueError("Invalid file extension for the training dataset.")

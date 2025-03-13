@@ -5,7 +5,7 @@ import inspect
 import time
 from typing import Dict, Union
 import flatnav
-import logging 
+import logging
 
 
 class MetricConfig(BaseModel):
@@ -134,7 +134,6 @@ metric_manager.register_metric(
     config=MetricConfig(description="Index build time (s)", worst_value=float("inf")),
     function=lambda build_time: build_time,
 )
-
 
 
 def compute_metrics(

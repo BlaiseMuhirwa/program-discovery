@@ -4,8 +4,7 @@ from abstractions import (
     Expression,
     Statement,
     PruningAlgorithm,
-    dedupe_variable_list,
-    build_beam_search,
+    build_baseline_pruning_algorithm,
     ForEachStatement,
     IfElseStatement,
     AssignmentStatement,
@@ -18,6 +17,7 @@ from copy import deepcopy
 import flatnav
 from flatnav.data_type import DataType
 import numpy as np
+
 
 class PruningProgramSearchExecutor:
     def __init__(
@@ -37,7 +37,9 @@ class PruningProgramSearchExecutor:
 
         return distance_fn
 
-    def __call__(self, candidates: list[tuple[float, int]], M: int) -> list[tuple[float, int]]:
+    def __call__(
+        self, candidates: list[tuple[float, int]], M: int
+    ) -> list[tuple[float, int]]:
         """
         Execute the pruning algorithm.
         NOTE: The list of candidates is retrieved from the C++ backend.
@@ -54,9 +56,6 @@ class PruningProgramSearchExecutor:
             "take_first_M": lambda x: x[:M],
             "distance_fn": self.distance_fn,
         }
-
-        for _ in range(10):
-            print("Statement executed...")
 
         # Add all the callable functions
         for fn in ALL_CALLABLES:
@@ -96,6 +95,7 @@ class PruningProgramSearchExecutor:
         elif isinstance(statement, ForEachStatement):
             iterable = env[statement._iterable.name]
             for item in iterable:
+                # print(f"Item: {item}")
                 env[statement._item_variable.name] = item
                 # Recursively execute each sub-statement
                 for sub_stmt in statement._statements:
@@ -112,9 +112,12 @@ class PruningProgramSearchExecutor:
 
 
 def setup_index_with_pruning_algorithm(index, pruning_algorithm):
-    executor = PruningProgramSearchExecutor(pruning_algorithm=pruning_algorithm, index=index)
+    executor = PruningProgramSearchExecutor(
+        pruning_algorithm=pruning_algorithm, index=index
+    )
     index.set_pruning_callback(callback=executor)
     return index
+
 
 def evaluate_index(index, queries, ground_truth) -> dict:
     metrics = compute_metrics(
@@ -128,7 +131,7 @@ def evaluate_index(index, queries, ground_truth) -> dict:
         index=index,
         queries=queries,
         ground_truth=ground_truth,
-        ef_search=100
+        ef_search=100,
     )
 
     score = metrics["recall"] * metrics["qps"]
@@ -146,7 +149,7 @@ def run_program_search(
     dim: int,
     dataset_size: int,
     max_edges_per_node: int,
-    num_iterations: int = 1000
+    num_iterations: int = 1000,
 ) -> tuple[str, dict]:
     """
     Run program search to discover the optimal pruning algorithm.
@@ -157,12 +160,12 @@ def run_program_search(
         dim=dim,
         dataset_size=dataset_size,
         max_edges_per_node=max_edges_per_node,
-        verbose=False,
-        collect_stats=False
+        verbose=True,
+        collect_stats=False,
     )
     index.set_num_threads(4)
     # Create a pruning algorithm
-    best_algorithm = build_beam_search()
+    best_algorithm = build_baseline_pruning_algorithm()
     index = setup_index_with_pruning_algorithm(index, best_algorithm)
 
     index.add(dataset, ef_construction=100, num_initializations=100)
@@ -202,25 +205,26 @@ def run_program_search(
             dim=dim,
             dataset_size=dataset_size,
             max_edges_per_node=max_edges_per_node,
-            verbose=False,
-            collect_stats=False
+            verbose=True,
+            collect_stats=False,
         )
         index.set_num_threads(4)
         index = setup_index_with_pruning_algorithm(index, candidate_algorithm)
         index.add(dataset, ef_construction=100, num_initializations=100)
 
+        print(f"Current algorithm: \n{candidate_algorithm.to_str()}")
         metrics = evaluate_index(index, queries, ground_truth)
+        print(f"Current metrics: {metrics}")
 
-        # Update if better 
+        # Update if better
         if metrics["score"] > best_metrics["score"]:
             best_metrics = metrics
             best_algorithm = candidate_algorithm
 
             print(f"Iteration {i+1}: {metrics}")
-            print(f"New best algorithm: {best_algorithm.to_str()}")
+            print(f"New best algorithm: \n{best_algorithm.to_str()}")
 
     return best_algorithm, best_metrics
-
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -290,7 +294,6 @@ def parse_arguments() -> argparse.Namespace:
     return parser.parse_args()
 
 
-
 def main():
     args = parse_arguments()
 
@@ -307,12 +310,12 @@ def main():
         dim=dataset.shape[1],
         dataset_size=dataset.shape[0],
         max_edges_per_node=16,
-        num_iterations=1000
+        num_iterations=1000,
     )
 
     print(f"Best algorithm: {best_algorithm.to_str()}")
     print(f"Best metrics: {best_metrics}")
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     main()

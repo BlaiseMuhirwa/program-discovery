@@ -910,12 +910,16 @@ class PruningAlgorithm:
 
 class Node:
     """Datatype for (node ID, distance) that supports distance computations."""
+
     def __init__(self, node_id: int, distance: float):
         self.node_id = node_id
         self.distance = distance
-    
+
     def __eq__(self, other):
         return self.node_id == other.node_id
+
+    def __str__(self):
+        return f"Node({self.node_id}, {self.distance})"
 
 
 def greater_or_equal(x: float, y: float) -> bool:
@@ -941,7 +945,7 @@ def argmin_distance(x: list[Node]) -> Node:
         if node.distance < min_distance:
             min_distance = node.distance
             min_node = node
-    
+
     return min_node
 
 
@@ -954,24 +958,31 @@ def argmax_distance(x: list[Node]) -> Node:
             max_node = node
     return max_node
 
+
 def min_distance(x: list[Node], y: Node) -> float:
     return 0.0
+
 
 def max_distance(x: list[Node], y: Node) -> float:
     return 0.0
 
+
 def median_distance(x: list[Node], y: Node) -> float:
     return 0.0
 
+
 def mean_distance(x: list[Node], y: Node) -> float:
     return 0.0
+
 
 def append_node(x: list[Node], y: Node) -> list[Node]:
     x.append(y)
     return x
 
+
 def take_first_M(x: list[Node]) -> list[Node]:
     return x
+
 
 def distance_to_query(x: Node) -> float:
     return 0.0
@@ -1002,7 +1013,7 @@ def call(callable_fn, *var_list):
     return CallableExpression(var_list, callable_fn)
 
 
-def build_beam_search():
+def build_baseline_pruning_algorithm():
     algorithm = PruningAlgorithm()
     statements = []
     # sorted_candidates = sort_by_distance_asc(input_candidates)
@@ -1035,7 +1046,7 @@ def build_beam_search():
                 if_statements=[
                     # append_node(candidate, saved_candidates)
                     assign(
-                        saved_candidates, call(append_node, candidate, saved_candidates)
+                        saved_candidates, call(append_node, saved_candidates, candidate)
                     ),
                 ],
                 else_statements=[],
@@ -1053,54 +1064,3 @@ def build_select_neighbors_heuristic():
     Build the base HNSW select neighbors heuristic.
     """
     pass
-
-
-algo = build_beam_search()
-print("Original beam search algorithm:")
-print(algo.to_str())
-
-
-# action_weights = {"INIT": 90, "REASSIGN": 10, "IF_ELSE": 0, "FOR_EACH": 0}
-# for i in range(20):
-#     algo.add_new_statement(
-#         callables_library=ALL_CALLABLES,
-#         action_weights=action_weights,
-#     )
-
-# # '''
-# for i in range(20):
-#     print(f"Iteration {i}")
-#     algo.mutate(
-#         callables_library=ALL_CALLABLES,
-#         add_action_weights=action_weights,
-#         mutate_action_weights={"ADD_NEW": 30, "MUTATE": 70},
-#     )
-#     print(algo.to_str())
-# '''
-
-"""
-statement_info = statement_mutation_info(algo.statements)
-for key, info in statement_info.items():
-    print(key.to_str().split("\n")[0], f"({key})")
-    print("\t", [v._name for v in info.in_scope_variables])
-    new_state = sample_foreach_statement(info.in_scope_variables, ALL_CALLABLES, "item_0")
-    if new_state is not None:
-        print("\tPossible new FOR-LOOP:")
-        print(new_state.to_str(indent_level=3))
-        print("")
-    # expr = sample_callable_expression(info.in_scope_variables, ALL_CALLABLES, list[Node])
-    # if expr is not None:
-    #     print("\tPossible new EXPR:")
-    #     print("\t\t", expr.to_str())
-    #     print("")
-    new_state = sample_initialization_statement(info.in_scope_variables, ALL_CALLABLES, "new_var")
-    if new_state is not None:
-        print("\tPossible new INIT:")
-        print(new_state.to_str(indent_level=3))
-        print("")
-    new_state = sample_reassignment_statement(info.in_scope_variables, ALL_CALLABLES)
-    if new_state is not None:
-        print("\tPossible new REASSIGN:")
-        print(new_state.to_str(indent_level=3))
-        print("")
-# """

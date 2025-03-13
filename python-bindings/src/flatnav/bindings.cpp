@@ -5,6 +5,7 @@
 #include <flatnav/index/FlexibleIndex.h>
 #include <flatnav/util/Datatype.h>
 #include <flatnav/util/Multithreading.h>
+#include <pybind11/embed.h>  // For py::scoped_interpreter
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -19,10 +20,8 @@
 #include <vector>
 #include "docs.h"
 
-
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
-
 
 using flatnav::FlexibleIndex;
 using flatnav::distances::DistanceInterface;
@@ -229,13 +228,27 @@ class PyIndex : public std::enable_shared_from_this<PyIndex<dist_t, label_t>> {
     return {dists, labels};
   }
 
-
+  /**
+ * @brief Executes a custom pruning logic using a Python callback.
+ *
+ * This function converts a C++ PriorityQueue to a Python `py::list`, invokes a
+ * user-defined pruning callback, and updates the original PriorityQueue with
+ * the pruned results. The Python GIL must be acquired before interacting with
+ * Python objects to ensure thread safety, as Python's interpreter is not thread-safe by default.
+ *
+ * @param neighbors The PriorityQueue containing candidate nodes for pruning.
+ * @param M The maximum number of candidates to retain after pruning.
+ *
+ * @throws std::runtime_error If the pruning callback is not set.
+ * @throws py::error_already_set If the callback raises a Python exception.
+ * @throws std::invalid_argument If the callback result is not a list of tuples.
+ */
   void executeCustomPruning(typename FlexibleIndex<dist_t, label_t>::PriorityQueue& neighbors, int M) {
-    // Convert C++ PriorityQueue to python list
+    py::gil_scoped_acquire gil;
     py::list candidates;
     std::vector<std::pair<float, label_t>> temp_storage;
 
-    // store items temporarily since we're emptying the queue
+    // Store items temporarily since we're emptying the queue
     while (!neighbors.empty()) {
       auto pair = neighbors.top();
       temp_storage.push_back({pair.first, pair.second});
@@ -246,16 +259,13 @@ class PyIndex : public std::enable_shared_from_this<PyIndex<dist_t, label_t>> {
     // Invoke the python pruning callback
     py::object result;
     try {
-      result = this->_pruning_callback(candidates, M); 
-      std::cout << "Pruning callback executed successfully" << "\n" << std::flush;
-    } catch(const py::error_already_set& e) {
-      // If an exception is thrown in the callback, we need to catch it and 
-      // print it to stderr
-      // First, let's restore the items back to the queue
-      for (const auto& [distance, id]: temp_storage) {
+      result = this->_pruning_callback(candidates, M);
+    } catch (const py::error_already_set& e) {
+      for (const auto& [distance, id] : temp_storage) {
         neighbors.emplace(distance, id);
       }
-      PyErr_Print();
+      // Print the Python traceback
+      PyErr_Print();  
       throw;
     }
 
@@ -269,16 +279,13 @@ class PyIndex : public std::enable_shared_from_this<PyIndex<dist_t, label_t>> {
         neighbors.emplace(dist, id);
       }
     } catch (const py::cast_error& e) {
-      // If for some reason conversion fails, restore the original queue 
-      // and throw an exception
-      for (const auto& [distance, id]: temp_storage) {
+      // Restore the original queue if conversion fails
+      for (const auto& [distance, id] : temp_storage) {
         neighbors.emplace(distance, id);
       }
       throw std::invalid_argument("Pruning callback must return a list of tuples with (distance, id).");
     }
-
   }
-
 
  public:
   explicit PyIndex(std::unique_ptr<FlexibleIndex<dist_t, label_t>> index)
@@ -318,16 +325,17 @@ class PyIndex : public std::enable_shared_from_this<PyIndex<dist_t, label_t>> {
 
   void setPruningCallback(py::object callback) {
     // TODO: Check whether we need to use std::move here
+    std::cout << "Setting pruning callback" << "\n" << std::flush;
     this->_pruning_callback = std::move(callback);
     if (_pruning_callback.is_none()) {
       throw std::invalid_argument("Pruning callback must be a callable object.");
     }
 
     this->_index->setPruningFunction(
-      [this](typename FlexibleIndex<dist_t, label_t>::PriorityQueue& neighbors, int M) {
-        this->executeCustomPruning(neighbors, M);
-      }
-    );
+        [this](typename FlexibleIndex<dist_t, label_t>::PriorityQueue& neighbors, int M) {
+          auto pq_size = neighbors.size();
+          this->executeCustomPruning(neighbors, M);
+        });
   }
 
   ~PyIndex() { delete _index; }
@@ -374,8 +382,7 @@ class PyIndex : public std::enable_shared_from_this<PyIndex<dist_t, label_t>> {
   static std::shared_ptr<PyIndex<dist_t, label_t>> loadIndex(const std::string& filename) {
     auto index = FlexibleIndex<dist_t, label_t>::loadIndex(/* filename = */ filename);
     auto flexible_index = std::unique_ptr<FlexibleIndex<dist_t, label_t>>(
-      static_cast<FlexibleIndex<dist_t, label_t>*>(index.release())
-    );
+        static_cast<FlexibleIndex<dist_t, label_t>*>(index.release()));
     return std::make_shared<PyIndex<dist_t, label_t>>(std::move(flexible_index));
   }
 
@@ -545,9 +552,10 @@ void bindSpecialization(py::module_& index_submodule) {
       .def_static("load_index", &IndexType::loadIndex, py::arg("filename"), LOAD_INDEX_DOCSTRING)
       .def_property_readonly("max_edges_per_node", &IndexType::getMaxEdgesPerNode)
       .def_property_readonly("num_threads", &IndexType::getNumThreads, NUM_THREADS_DOCSTRING)
-      .def("get_distance_between_nodes", &IndexType::getDistanceBetweenNodes, py::arg("node1"), py::arg("node2"),
-           "Get the distance between two nodes.")
-      .def("set_pruning_callback", &IndexType::setPruningCallback, py::arg("callback"), "Set a custom pruning callback.");
+      .def("get_distance_between_nodes", &IndexType::getDistanceBetweenNodes, py::arg("node1"),
+           py::arg("node2"), "Get the distance between two nodes.")
+      .def("set_pruning_callback", &IndexType::setPruningCallback, py::arg("callback"),
+           "Set a custom pruning callback.");
 }
 
 void defineIndexSubmodule(py::module_& index_submodule) {
@@ -600,10 +608,10 @@ void defineDistanceEnums(py::module_& module) {
 PYBIND11_MODULE(_core, module) {
 #ifdef VERSION_INFO
   module.attr("__version__") = TOSTRING(VERSION_INFO);
-  #pragma message("VERSION_INFO: " TOSTRING(VERSION_INFO))
+#pragma message("VERSION_INFO: " TOSTRING(VERSION_INFO))
 #else
   module.attr("__version__") = "dev";
-  #pragma message("VERSION_INFO is not defined")
+#pragma message("VERSION_INFO is not defined")
 #endif
 
   module.doc() = CXX_EXTENSION_MODULE_DOCSTRING;
