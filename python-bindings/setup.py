@@ -2,6 +2,7 @@ import os
 from skbuild import setup
 import sys, subprocess
 from typing import List
+
 __version__ = "0.1.2"
 
 package_description_path = os.path.join(
@@ -9,6 +10,7 @@ package_description_path = os.path.join(
 )
 with open(package_description_path, "r") as f:
     package_description = f.read()
+
 
 class UnsupportedPlatformError(Exception):
     pass
@@ -50,7 +52,7 @@ def construct_cmake_args() -> List[str]:
         omp_flag = "-Xpreprocessor -fopenmp"
         cmake_include_directories.extend(["/opt/homebrew/opt/libomp/include"])
         cmake_linker_args.extend(["-lomp", "-L/opt/homebrew/opt/libomp/lib"])
-        
+
         # Base compile args for all platforms
         compile_args = [
             omp_flag,
@@ -60,18 +62,16 @@ def construct_cmake_args() -> List[str]:
             "-ffast-math",
             "-funroll-loops",
         ]
-        
+
         # Add x86_64 specific flags for macOS
-        compile_args.extend([
-            "-arch", "x86_64",
-            "-mmacosx-version-min=10.14",
-            "-stdlib=libc++"
-        ])
-        
+        compile_args.extend(
+            ["-arch", "x86_64", "-mmacosx-version-min=10.14", "-stdlib=libc++"]
+        )
+
     elif sys.platform in ["linux", "linux2"]:
         omp_flag = "-fopenmp"
         cmake_linker_args.extend(["-fopenmp"])
-        
+
         compile_args = [
             omp_flag,
             "-Ofast",
@@ -80,7 +80,7 @@ def construct_cmake_args() -> List[str]:
             "-ffast-math",
             "-funroll-loops",
             # Keep native architecture only for Linux
-            "-march=native"  
+            "-march=native",
         ]
 
     # Add SIMD flags if SIMD vectorization is enabled
@@ -108,11 +108,13 @@ def construct_cmake_args() -> List[str]:
     cmake_args = []
     cmake_args.append(f"-DCMAKE_INCLUDE_PATH={';'.join(cmake_include_directories)}")
     cmake_args.append(f"-DCMAKE_CXX_FLAGS={' '.join(compile_args)}")
+    cmake_args.append(f"-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64")
 
     if cmake_linker_args:
         cmake_args.append(f"-DCMAKE_EXE_LINKER_FLAGS={' '.join(cmake_linker_args)}")
 
     return cmake_args
+
 
 setup(
     name="flatnav",
@@ -136,7 +138,7 @@ setup(
     install_requires=[
         # The following need to be synced with pyproject.toml
         "numpy>=1.21.0,<2",
-        "h5py==3.11.0"
+        "h5py==3.11.0",
     ],
     license="Apache License, Version 2.0",
     keywords=["similarity search", "vector databases", "machine learning"],
@@ -161,4 +163,3 @@ setup(
     ],
     include_package_data=True,
 )
-

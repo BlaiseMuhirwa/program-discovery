@@ -1,7 +1,7 @@
 #include <developmental-features/quantization/ProductQuantization.h>
 #include <flatnav/distances/InnerProductDistance.h>
 #include <flatnav/distances/SquaredL2Distance.h>
-#include <flatnav/index/Index.h>
+#include <flatnav/index/FlexibleIndex.h>
 #include <flatnav/util/Datatype.h>
 #include <chrono>
 #include <cmath>
@@ -16,6 +16,7 @@
 #include <string>
 #include "cnpy.h"
 
+using flatnav::FlexibleIndex;
 using flatnav::Index;
 using flatnav::distances::InnerProductDistance;
 using flatnav::distances::SquaredL2Distance;
@@ -26,7 +27,7 @@ template <typename dist_t>
 void run(float* queries, int* gtruth, const std::string& index_filename, const std::vector<int>& ef_searches,
          int K, int num_queries, int num_gtruth, int dim, bool reorder = true) {
 
-  std::unique_ptr<Index<dist_t, int>> index = Index<dist_t, int>::loadIndex(index_filename);
+  std::unique_ptr<Index<dist_t, int>> index = FlexibleIndex<dist_t, int>::loadIndex(index_filename);
 
   std::cout << "[INFO] Index loaded" << std::endl;
   index->getIndexSummary();

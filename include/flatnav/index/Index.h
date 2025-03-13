@@ -35,11 +35,11 @@ namespace flatnav {
 // label_t: A fixed-width data type for the label (meta-data) of each point.
 template <typename dist_t, typename label_t>
 class Index {
+public:
   typedef std::pair<float, label_t> dist_label_t;
   // internal node numbering scheme. We might need to change this to uint64_t
   typedef uint32_t node_id_t;
   typedef std::pair<float, node_id_t> dist_node_t;
-
   // NOTE: by default this is a max-heap. We could make this a min-heap
   // by using std::greater, but we want to use the queue as both a max-heap and
   // min-heap depending on the context.
@@ -49,9 +49,8 @@ class Index {
       return a.first < b.first;
     }
   };
-
   typedef std::priority_queue<dist_node_t, std::vector<dist_node_t>, CompareByFirst> PriorityQueue;
-
+protected:
   // Large (several GB), pre-allocated block of memory.
   char* _index_memory;
 
@@ -140,7 +139,7 @@ class Index {
     archive(cereal::binary_data(_index_memory, total_mem));
   }
 
- public:
+public:
   /**
    * @brief Construct a new Index object for approximate near neighbor search.
    *
@@ -373,7 +372,7 @@ class Index {
         /* buffer_size = */ ef_construction);
 
     int selection_M = std::max(static_cast<int>(_M / 2), 1);
-    selectNeighbors(/* neighbors = */ neighbors, /* M = */ selection_M);
+    defaultSelectNeighbors(/* neighbors = */ neighbors, /* M = */ selection_M);
     connectNeighbors(neighbors, new_node_id);
   }
 
@@ -530,6 +529,8 @@ class Index {
 
   inline DataType getDataType() const { return _data_type; }
 
+  inline DistanceInterface<dist_t>* distance() const { return _distance.get(); }
+
   void resetStats() {
     _distance_computations = 0;
     _metric_hops = 0;
@@ -546,16 +547,15 @@ class Index {
 
     _distance->getSummary();
   }
-
- private:
-  friend class cereal::access;
-  // Default constructor for cereal
-  Index() = default;
-
+  
   char* getNodeData(const node_id_t& n) const {
     uint64_t byte_offset = static_cast<uint64_t>(n) * static_cast<uint64_t>(_node_size_bytes);
     return _index_memory + byte_offset;
   }
+ protected:
+  friend class cereal::access;
+  // Default constructor for cereal
+  Index() = default;
 
   node_id_t* getNodeLinks(const node_id_t& n) const {
     uint64_t byte_offset = static_cast<uint64_t>(n) * static_cast<uint64_t>(_node_size_bytes);
@@ -711,7 +711,7 @@ class Index {
    * heuristic. The neighbors priority queue contains elements sorted by
    * distance where the top element is the furthest neighbor from the query.
    */
-  void selectNeighbors(PriorityQueue& neighbors, int M) {
+  void defaultSelectNeighbors(PriorityQueue& neighbors, int M) {
     if (neighbors.size() < M) {
       return;
     }
@@ -809,8 +809,8 @@ class Index {
             candidates.emplace(distance, label);
           }
         }
-        // 2X larger than the previous call to selectNeighbors.
-        selectNeighbors(candidates, _M);
+        // 2X larger than the previous call to defaultSelectNeighbors.
+        defaultSelectNeighbors(candidates, _M);
         // connect the pruned set of candidates, including self-loops:
         size_t j = 0;
         while (candidates.size() > 0) {  // candidates

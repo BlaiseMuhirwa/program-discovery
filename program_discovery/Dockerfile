@@ -81,6 +81,7 @@ WORKDIR ${FLATNAV_PATH}/program_discovery
 
 # Install the wheels under /root/wheelhouse
 RUN poetry run pip install wheelhouse/*.whl --force-reinstall
+RUN poetry install --no-dev
 
 
-ENTRYPOINT ["poetry", "run", "python", "evaluate.py"]
+ENTRYPOINT ["make", "mnist-bench-flatnav"]

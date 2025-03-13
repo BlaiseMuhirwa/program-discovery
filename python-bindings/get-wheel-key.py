@@ -1,7 +1,6 @@
-
-
 import platform
 import sys
+
 
 def get_wheel_key():
     """
@@ -9,17 +8,17 @@ def get_wheel_key():
     """
     try:
         version = platform.python_version_tuple()
-        key = "".join(version[0:2]) 
-        
+        key = "".join(version[0:2])
+
         system = platform.system().lower()
-        
+
         if system == "linux":
             platform_tag = "manylinux_x86_64"
         elif system == "darwin":
             platform_tag = "macosx_x86_64"
         else:
             raise ValueError(f"Unsupported platform: {system}")
-            
+
         return f"cp{key}-{platform_tag}"
     except Exception as e:
         print(f"Error generating wheel key: {e}", file=sys.stderr)
